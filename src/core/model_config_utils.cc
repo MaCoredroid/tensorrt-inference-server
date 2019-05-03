@@ -26,10 +26,9 @@
 
 #include "src/core/model_config_utils.h"
 
+#include <cuda_runtime_api.h>
 #include <deque>
 #include <set>
-#include "absl/strings/numbers.h"
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
@@ -43,7 +42,10 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
   auto version_dir = BaseName(path);
 
   // Determine the version from the last segment of 'path'
-  if (!absl::SimpleAtoi(version_dir, version)) {
+  try {
+    *version = std::atoll(version_dir.c_str());
+  }
+  catch (...) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to determine model version from " + path);
@@ -174,7 +176,7 @@ GetSequenceControlProperties(
 
 Status
 GetNormalizedModelConfig(
-    const std::string& path, const PlatformConfigMap& platform_config_map,
+    const std::string& path, const BackendConfigMap& backend_config_map,
     const bool autofill, ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
@@ -192,7 +194,7 @@ GetNormalizedModelConfig(
     const std::string model_name(BaseName(path));
     std::unique_ptr<AutoFill> af;
     RETURN_IF_ERROR(AutoFill::Create(
-        model_name, platform_config_map, std::string(path), *config, &af));
+        model_name, backend_config_map, std::string(path), *config, &af));
     RETURN_IF_ERROR(af->Fix(config));
 
     LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();

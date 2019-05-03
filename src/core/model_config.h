@@ -43,9 +43,13 @@ using MetricTagsMap = ::google::protobuf::Map<
     ::google::protobuf::string, ::google::protobuf::string>;
 
 /// The type from platform name to the backend configuration for that
-/// platform.
-using PlatformConfigMap =
-    std::unordered_map<std::string, ::google::protobuf::Any>;
+/// platform. The configuration is determined primarily by
+/// command-line options and is the same for every backend created for
+/// a given platform.
+struct BackendConfig {
+};
+using BackendConfigMap =
+    std::unordered_map<std::string, std::shared_ptr<BackendConfig>>;
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.

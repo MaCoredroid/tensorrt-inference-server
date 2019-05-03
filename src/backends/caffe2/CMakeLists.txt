@@ -25,24 +25,29 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (trtis-clients)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
+#
+# NetDef backend
+#
+# netdef_backend_c2 is copied into and built along with Caffe2 to
+# ensure that it uses the same protobuf as Caffe2, so not included in
+# these sources.
+#
+set(
+  NETDEF_SRCS
+  autofill.cc
+  netdef_backend_factory.cc
+  netdef_backend.cc
+)
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(
+  NETDEF_HDRS
+  autofill.h
+  netdef_backend_factory.h
+  netdef_backend.h
+)
 
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
-
-add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/clients/c++ src/clients/c++)
-add_subdirectory(../../src/clients/python src/clients/python)
+add_library(
+  netdef-backend-library EXCLUDE_FROM_ALL OBJECT
+  ${NETDEF_SRCS} ${NETDEF_HDRS}
+)

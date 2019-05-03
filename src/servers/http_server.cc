@@ -26,12 +26,12 @@
 
 #include "src/servers/http_server.h"
 
+#include <event2/buffer.h>
+#include <evhtp/evhtp.h>
 #include <google/protobuf/text_format.h>
 #include <algorithm>
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "evhtp/evhtp.h"
-#include "libevent/include/event2/buffer.h"
 #include "re2/re2.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"

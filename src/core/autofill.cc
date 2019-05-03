@@ -32,8 +32,6 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -99,7 +97,7 @@ AutoFillSimple::Fix(ModelConfig* config)
 //
 Status
 AutoFill::Create(
-    const std::string& model_name, const PlatformConfigMap& platform_config_map,
+    const std::string& model_name, const BackendConfigMap& backend_config_map,
     const std::string& model_path, const ModelConfig& config,
     std::unique_ptr<AutoFill>* autofill)
 {
@@ -113,13 +111,13 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afsm;
-    ::google::protobuf::Any platform_config;
-    auto it = platform_config_map.find(kTensorFlowSavedModelPlatform);
-    if (it != platform_config_map.end()) {
-      platform_config = it->second;
+    std::shared_ptr<BackendConfig> backend_config;
+    auto it = backend_config_map.find(kTensorFlowSavedModelPlatform);
+    if (it != backend_config_map.end()) {
+      backend_config = it->second;
     }
     Status status = AutoFillSavedModel::Create(
-        model_name, platform_config, model_path, &afsm);
+        model_name, backend_config, model_path, &afsm);
     if (status.IsOk()) {
       *autofill = std::move(afsm);
       return Status::Success;

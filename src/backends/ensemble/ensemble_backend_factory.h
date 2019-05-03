@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/backends/ensemble/ensemble_backend.h"
-#include "src/backends/ensemble/ensemble_backend.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -35,8 +34,11 @@ namespace nvidia { namespace inferenceserver {
 // corresponding ensemble backend.
 class EnsembleBackendFactory {
  public:
+  struct Config : public BackendFactoryConfig {
+  };
+
   static Status Create(
-      const EnsemblePlatformConfig& platform_config,
+      const Config& backend_config,
       std::unique_ptr<EnsembleBackendFactory>* factory);
 
   Status CreateBackend(
@@ -48,12 +50,12 @@ class EnsembleBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(EnsembleBackendFactory);
 
-  EnsembleBackendFactory(const EnsemblePlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  EnsembleBackendFactory(const Config& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const EnsemblePlatformConfig platform_config_;
+  const Config backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

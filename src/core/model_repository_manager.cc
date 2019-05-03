@@ -31,15 +31,10 @@
 #include <deque>
 #include <stdexcept>
 #include <thread>
-#include "src/backends/caffe2/netdef_backend.pb.h"
 #include "src/backends/caffe2/netdef_backend_factory.h"
-#include "src/backends/custom/custom_backend.pb.h"
 #include "src/backends/custom/custom_backend_factory.h"
-#include "src/backends/ensemble/ensemble_backend.pb.h"
 #include "src/backends/ensemble/ensemble_backend_factory.h"
-#include "src/backends/tensorflow/graphdef_backend.pb.h"
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
 #include "src/backends/tensorflow/savedmodel_backend_factory.h"
 #include "src/backends/tensorrt/plan_backend.pb.h"
 #include "src/backends/tensorrt/plan_backend_factory.h"
@@ -55,88 +50,55 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 
 void
-BuildPlatformConfigMap(
+BuildBackendConfigMap(
     const std::string& version, const std::string& model_store_path,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
-    const bool tf_allow_soft_placement, PlatformConfigMap* platform_configs)
+    const bool tf_allow_soft_placement, BackendConfigMap* backend_configs)
 {
-  ::google::protobuf::Any platform_config;
-
-  //// Tensorflow GraphDef
+  //// Tensorflow GraphDef and SavedModel
   {
-    GraphDefPlatformConfig graphdef_config;
-
-    graphdef_config.set_autofill(!strict_model_config);
-
-    // Tensorflow session config
-    if (tf_gpu_memory_fraction == 0.0) {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
-    } else {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
-    }
-
-    graphdef_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    platform_config.PackFrom(graphdef_config);
-    (*platform_configs)[kTensorFlowGraphDefPlatform] = platform_config;
-  }
-
-  //// Tensorflow SavedModel
-  {
-    SavedModelPlatformConfig saved_model_config;
-
-    saved_model_config.set_autofill(!strict_model_config);
+    auto graphdef_config = std::make_shared<GraphDefBackendFactory::Config>();
+    graphdef_config->autofill = !strict_model_config;
 
     if (tf_gpu_memory_fraction == 0.0) {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
+      graphdef_config->allow_gpu_memory_growth = true;
     } else {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
+      graphdef_config->allow_gpu_memory_growth = false;
+      graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
     }
 
-    saved_model_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    platform_config.PackFrom(saved_model_config);
-    (*platform_configs)[kTensorFlowSavedModelPlatform] = platform_config;
+    graphdef_config->allow_soft_placement = tf_allow_soft_placement;
+
+    (*platform_configs)[kTensorFlowGraphDefPlatform] = graphdef_config;
+    (*platform_configs)[kTensorFlowSavedModelPlatform] = graphdef_config;
   }
 
   //// Caffe NetDef
   {
-    NetDefPlatformConfig netdef_config;
-    netdef_config.set_autofill(!strict_model_config);
-    platform_config.PackFrom(netdef_config);
-    (*platform_configs)[kCaffe2NetDefPlatform] = platform_config;
+    auto netdef_config = std::make_shared<NetDefBackendFactory::Config>();
+    netdef_config->autofill = !strict_model_config;
+    (*platform_configs)[kCaffe2NetDefPlatform] = netdef_config;
   }
 
   //// TensorRT
   {
-    PlanPlatformConfig plan_config;
-    plan_config.set_autofill(!strict_model_config);
-    platform_config.PackFrom(plan_config);
-    (*platform_configs)[kTensorRTPlanPlatform] = platform_config;
+    auto plan_config = std::make_shared<PlanBackendFactory::Config>();
+    plan_config->autofill = !strict_model_config;
+    (*platform_configs)[kTensorRTPlanPlatform] = plan_config;
   }
 
   //// Custom
   {
-    CustomPlatformConfig custom_config;
-    custom_config.set_inference_server_version(version);
-    custom_config.set_model_repository_path(model_store_path);
-    platform_config.PackFrom(custom_config);
-    (*platform_configs)[kCustomPlatform] = platform_config;
+    auto custom_config = std::make_shared<CustomBackendFactory::Config>();
+    custom_config->inference_server_version = version;
+    custom_config->model_repository_path = model_store_path;
+    (*platform_configs)[kCustomPlatform] = custom_config;
   }
 
   //// Ensemble
   {
-    EnsemblePlatformConfig ensemble_config;
-    platform_config.PackFrom(ensemble_config);
-    (*platform_configs)[kEnsemblePlatform] = platform_config;
+    auto ensemble_config = std::make_shared<EnsembleBackendFactory::Config>();
+    (*platform_configs)[kEnsemblePlatform] = ensemble_config;
   }
 }
 
@@ -388,38 +350,38 @@ ModelRepositoryManager::BackendLifeCycle::Create(
       new BackendLifeCycle(repository_path));
 
   {
-    GraphDefPlatformConfig config;
-    platform_map.find(kTensorFlowGraphDefPlatform)->second.UnpackTo(&config);
+    const std::make_shared<GraphDefBackendFactory::Config>& config =
+        platform_map.find(kTensorFlowGraphDefPlatform)->second;
     RETURN_IF_ERROR(GraphDefBackendFactory::Create(
         config, &(local_life_cycle->graphdef_factory_)));
   }
   {
-    SavedModelPlatformConfig config;
-    platform_map.find(kTensorFlowSavedModelPlatform)->second.UnpackTo(&config);
+    const std::make_shared<SavedModelBackendFactory::Config>& config =
+        platform_map.find(kTensorFlowSavedModelPlatform)->second;
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
   }
   {
-    NetDefPlatformConfig config;
-    platform_map.find(kCaffe2NetDefPlatform)->second.UnpackTo(&config);
+    const std::make_shared<NetDefBackendFactory::Config>& config =
+        platform_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
   {
-    PlanPlatformConfig config;
-    platform_map.find(kTensorRTPlanPlatform)->second.UnpackTo(&config);
+    const std::make_shared<PlanBackendFactory::Config>& config =
+        platform_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
   {
-    CustomPlatformConfig config;
-    platform_map.find(kCustomPlatform)->second.UnpackTo(&config);
+    const std::make_shared<CustomBackendFactory::Config>& config =
+        platform_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
   {
-    EnsemblePlatformConfig config;
-    platform_map.find(kEnsemblePlatform)->second.UnpackTo(&config);
+    const std::make_shared<EnsembleBackendFactory::Config>& config =
+        platform_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         config, &(local_life_cycle->ensemble_factory_)));
   }

@@ -56,6 +56,14 @@ install(
   FILES request.h request_grpc.h request_http.h
   DESTINATION include
 )
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/api.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/request_status.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/server_status.pb.h
+  DESTINATION include
+)
 
 #
 # ensemble_image_client
